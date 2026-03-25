@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>京都発送 ゆうパック料金計算</title>
+<style>
+  /* 全体の文字サイズを少し大きく、上下の余白を詰めて1画面に収める */
+  body { font-family: sans-serif; padding: 10px; background-color: #e9ecef; color: #333; font-size: 16px; line-height: 1.2; margin: 0; }
+  .container { max-width: 480px; margin: auto; background: white; padding: 12px 16px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); box-sizing: border-box; }
+  
+  h2 {
+    color: #004098;
+    margin-top: 0;
+    margin-bottom: 8px;
+    font-size: 20px; 
+    border-bottom: 2px solid #004098;
+    padding-bottom: 6px;
+    display: block;
+    text-align: center;
+  }
+
+  .section { margin-top: 10px; }
+  
+  /* 基本の見出しサイズ（オプション・割引などに適用） */
+  label.title { font-weight: bold; display: block; margin-bottom: 4px; color: #444; font-size: 15px; }
+  
+  /* 発送元・宛先、サイズの強調用見出しサイズ */
+  label.title-large { font-size: 18px; color: #222; margin-bottom: 6px; }
+  
+  /* ★プルダウンの中の文字を大きく（19px）変更 */
+  select { width: 100%; padding: 10px 10px; font-size: 19px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; background-color: #fafafa; font-weight: bold; cursor: pointer; }
+  
+  #origin { background-color: #e6f2ff; border-color: #004098; color: #004098; font-weight: bold; }
+
+  .location-group { display: flex; align-items: center; gap: 6px; }
+  .location-group select { flex: 1; }
+  .location-arrow { font-size: 20px; font-weight: bold; color: #004098; }
+
+  .options-box { background: #f8f9fa; border: 1px solid #dee2e6; padding: 10px 12px; border-radius: 4px; margin-top: 4px; }
+  
+  /* 1行に綺麗にまとめるための強力な設定 */
+  .checkbox-group { display: flex; align-items: center; margin-bottom: 8px; flex-wrap: nowrap; }
+  .checkbox-group:last-child { margin-bottom: 0; }
+  
+  .checkbox-group input[type="checkbox"] { width: 20px; height: 20px; margin-right: 6px; accent-color: #004098; cursor: pointer; flex-shrink: 0; }
+  
+  /* オプションの文字を少し大きくし、文字間隔を詰めて1行に収める */
+  .checkbox-group label { 
+    font-size: 15px; 
+    cursor: pointer; 
+    flex-grow: 1; 
+    user-select: none; 
+    white-space: nowrap; 
+    letter-spacing: -0.6px; /* 文字間を詰める */
+  }
+  
+  .price-tag, .price-tag-blue { 
+    font-size: 15px; 
+    font-weight: bold; 
+    white-space: nowrap; 
+    flex-shrink: 0; 
+  }
+  .price-tag { color: #e60012; }
+  .price-tag-blue { color: #004098; }
+
+  .checkbox-group.disabled { opacity: 0.4; pointer-events: none; }
+  hr { margin: 8px 0; border: none; border-top: 1px dashed #ccc; }
+
+  #result-box { margin-top: 12px; padding: 12px; background-color: #f0f7ff; border-radius: 6px; text-align: center; border: 2px solid #cce5ff; }
+  
+  #selected-options-label {
+    font-size: 13px;
+    color: #004098;
+    font-weight: bold;
+    margin-bottom: 6px;
+    background-color: #fff;
+    border: 1px solid #004098;
+    padding: 2px 10px;
+    border-radius: 15px;
+    display: none; 
+    line-height: 1.3;
+  }
+
+  /* 料金の文字サイズをしっかり大きく */
+  #result { font-size: 38px; font-weight: bold; color: #004098; letter-spacing: 0px; margin-bottom: 2px; }
+  #breakdown { font-size: 14px; color: #555; margin-top: 4px; line-height: 1.3; }
+
+  /* 非常に画面が小さいスマホ向けの微調整 */
+  @media (max-width: 360px) {
+    label.title-large { font-size: 16px; }
+    select { font-size: 16px; padding: 8px; } /* スマホ向けにプルダウンの文字サイズを微調整 */
+    .checkbox-group label { font-size: 14px; letter-spacing: -1px; }
+    .price-tag, .price-tag-blue { font-size: 14px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <h2>ゆうパック料金計算</h2>
+  
+  <div class="section">
+    <label class="title title-large" id="location-label">発送元(固定) → 宛先</label>
+    <div class="location-group">
+      <select id="origin"></select>
+      <span class="location-arrow">→</span>
+      <select id="destination" onchange="handleLogic('update')"></select>
+    </div>
+  </div>
+
+  <div class="section">
+    <label class="title title-large">サイズ</label>
+    <select id="size" onchange="handleLogic('size')">
+      <option value="60" style="color: #2E7D32;">60サイズ</option>
+      <option value="80" style="color: #2E7D32;">80サイズ</option>
+      <option value="100" style="color: #E65100;">100サイズ</option>
+      <option value="120" style="color: #E65100;">120サイズ</option>
+      <option value="140" style="color: #C62828;">140サイズ</option>
+      <option value="150" style="color: #004098; font-weight:bold;">150サイズ (チルド上限)</option>
+      <option value="160" style="color: #C62828;">160サイズ</option>
+      <option value="170" style="color: #C62828;">170サイズ</option>
+    </select>
+  </div>
+
+  <div class="section">
+    <label class="title">オプション・割引</label>
+    <div class="options-box">
+      <div class="checkbox-group">
+        <input type="checkbox" id="chk_multiple" onchange="handleLogic('multiple')">
+        <label for="chk_multiple">同一あて先・複数口割引</label>
+        <span class="price-tag">-60円</span>
+      </div>
+      
+      <div class="checkbox-group">
+        <input type="checkbox" id="chk_carryin" onchange="handleLogic('carryin')">
+        <label for="chk_carryin">持込割引</label>
+        <span class="price-tag">-120円</span>
+      </div>
+
+      <hr>
+
+      <div class="checkbox-group" id="group_chilled">
+        <input type="checkbox" id="chk_chilled" onchange="handleLogic('chilled')">
+        <label for="chk_chilled" style="color:#004098; font-weight:bold;">チルドゆうパック</label>
+        <span class="price-tag-blue">サイズ別加算</span>
+      </div>
+      
+      <div class="checkbox-group" id="group_weight">
+        <input type="checkbox" id="chk_weight" onchange="handleLogic('weight')">
+        <label for="chk_weight">重量ゆうパック (25〜30kg)</label>
+        <span class="price-tag">+560円</span>
+      </div>
+    </div>
+  </div>
+
+  <div id="result-box">
+    <div id="selected-options-label"></div>
+    <div id="result">820 円</div>
+    <div id="breakdown">基本運賃: 820円</div>
+  </div>
+</div>
+
+<script>
+  // --- 分かりやすい効果音の仕組み ---
+  let audioCtx = null;
+  let lastPrice = 0;
+
+  function playDQSound(type) {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    const now = audioCtx.currentTime;
+
+    if (type === 'click') {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(800, now);
+      gain.gain.setValueAtTime(0.01, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(now);
+      osc.stop(now + 0.05);
+    } else if (type === 'coin') {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(1046.50, now); 
+      osc.frequency.setValueAtTime(1318.51, now + 0.05); 
+      gain.gain.setValueAtTime(0.05, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(now);
+      osc.stop(now + 0.3);
+    } else if (type === 'discount') {
+      const notes = [1046.50, 1318.51, 1567.98]; 
+      notes.forEach((freq, i) => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0.04, now + i * 0.06);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.06 + 0.2);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(now + i * 0.06);
+        osc.stop(now + i * 0.06 + 0.2);
+      });
+    } else if (type === 'error') {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(150, now);
+      gain.gain.setValueAtTime(0.05, now);
+      gain.gain.linearRampToValueAtTime(0, now + 0.3);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(now);
+      osc.stop(now + 0.3);
+    }
+  }
+
+  const prefGroups = [
+    { label: "北海道", prefs: ["北海道"], color: "#006080" }, 
+    { label: "東北", prefs: ["青森県","岩手県","宮城県","秋田県","山形県","福島県"], color: "#2E7D32" }, 
+    { label: "関東", prefs: ["茨城県","栃木県","群馬県","埼玉県","千葉県","東京都","神奈川県","山梨県"], color: "#1565C0" }, 
+    { label: "信越", prefs: ["新潟県","長野県"], color: "#795548" }, 
+    { label: "北陸", prefs: ["富山県","石川県","福井県"], color: "#00838F" }, 
+    { label: "東海", prefs: ["岐阜県","静岡県","愛知県","三重県"], color: "#E65100" }, 
+    { label: "府内", prefs: ["京都府"], color: "#004098" }, 
+    { label: "近畿", prefs: ["滋賀県","大阪府","兵庫県","奈良県","和歌山県"], color: "#004098" }, 
+    { label: "中国", prefs: ["鳥取県","島根県","岡山県","広島県","山口県"], color: "#C62828" }, 
+    { label: "四国", prefs: ["徳島県","香川県","愛媛県","高知県"], color: "#F57C00" }, 
+    { label: "九州", prefs: ["福岡県","佐賀県","長崎県","熊本県","大分県","宮崎県","鹿児島県"], color: "#6A1B9A" }, 
+    { label: "沖縄", prefs: ["沖縄県"], color: "#D81B60" } 
+  ];
+
+  const tierRates = {
+    "Local": [820, 1130, 1450, 1770, 2120, 2450, 3000],
+    "Zone1": [880, 1200, 1500, 1830, 2170, 2500, 3070],
+    "Zone2": [990, 1310, 1620, 1940, 2300, 2610, 3750],
+    "Zone3": [1150, 1440, 1780, 2080, 2440, 2750, 3890],
+    "Hokkaido": [1740, 2040, 2350, 2650, 3010, 3330, 5030],
+    "Okinawa": [1450, 1810, 2160, 2490, 2860, 3180, 4350]
+  };
+
+  const sizeIndexMap = { "60": 0, "80": 1, "100": 2, "120": 3, "140": 4, "150": 5, "160": 5, "170": 6 };
+  const chilled_fees = { "60": 225, "80": 360, "100": 675, "120": 675, "140": 1330, "150": 2100 };
+
+  const getTier = (destId, destPref) => {
+    if (destPref === "京都府") return "Local";
+    switch(destId) {
+      case 0: return "Hokkaido";
+      case 1: return "Zone3"; 
+      case 2: 
+      case 3: 
+      case 10: return "Zone2"; 
+      case 11: return "Okinawa"; 
+      default: return "Zone1"; 
+    }
+  };
+
+  function initSelects() {
+    const originSelect = document.getElementById('origin');
+    const destSelect = document.getElementById('destination');
+    
+    const optionO = document.createElement('option');
+    optionO.value = `6_京都府`; optionO.text = "京都府";
+    optionO.selected = true; originSelect.appendChild(optionO);
+    originSelect.disabled = true;
+
+    prefGroups.forEach((group, regionId) => {
+      const optgroupDest = document.createElement('optgroup');
+      optgroupDest.label = group.label; optgroupDest.style.color = group.color;
+      group.prefs.forEach(pref => {
+        const optionD = document.createElement('option');
+        optionD.value = `${regionId}_${pref}`; 
+        optionD.text = pref;
+        optionD.style.color = group.color;
+        if (pref === "京都府") optionD.selected = true; 
+        optgroupDest.appendChild(optionD);
+      });
+      destSelect.appendChild(optgroupDest);
+    });
+  }
+
+  function handleLogic(changedId) {
+    if (changedId !== 'init') playDQSound('click');
+
+    const destSelect = document.getElementById('destination');
+    const sizeSelect = document.getElementById('size');
+    
+    if (changedId === 'update' || changedId === 'init') {
+      destSelect.style.color = destSelect.options[destSelect.selectedIndex].style.color;
+      const destParts = destSelect.value.split("_");
+      const destRegionId = parseInt(destParts[0]);
+      const regionName = prefGroups[destRegionId].label;
+      document.getElementById("location-label").innerText = `発送元(固定) → 宛先 (${regionName})`;
+    }
+
+    sizeSelect.style.color = sizeSelect.options[sizeSelect.selectedIndex].style.color;
+
+    const size = sizeSelect.value;
+    const chilled = document.getElementById("chk_chilled");
+    const weight = document.getElementById("chk_weight");
+    const groupChilled = document.getElementById("group_chilled");
+
+    if (size === "160" || size === "170") {
+      if (chilled.checked) { 
+        chilled.checked = false; 
+        playDQSound('error'); 
+        setTimeout(() => alert("チルドは150サイズまでです。"), 50); 
+      }
+      chilled.disabled = true; groupChilled.classList.add("disabled");
+    } else {
+      chilled.disabled = false; groupChilled.classList.remove("disabled");
+    }
+
+    if (changedId === 'chilled' && chilled.checked) weight.checked = false;
+    if (changedId === 'weight' && weight.checked) chilled.checked = false;
+    
+    calculateRate(changedId);
+  }
+
+  function calculateRate(changedId) {
+    const destParts = document.getElementById("destination").value.split("_");
+    const destRegionId = parseInt(destParts[0]);
+    const destPref = destParts[1];
+    const size = document.getElementById("size").value;
+    
+    const targetTier = getTier(destRegionId, destPref);
+    const basePrice = tierRates[targetTier][sizeIndexMap[size]];
+    let finalPrice = basePrice;
+    let breakdownText = `基本運賃: ${basePrice.toLocaleString()}円`;
+
+    const isChilled = document.getElementById("chk_chilled").checked;
+    const isWeight = document.getElementById("chk_weight").checked;
+    const isCarryIn = document.getElementById("chk_carryin").checked;
+    const isMultiple = document.getElementById("chk_multiple").checked;
+
+    let activeOptions = [];
+
+    if (isMultiple) { 
+      finalPrice -= 60; 
+      breakdownText += `<br>- 複数/同一割引: 60円`; 
+      activeOptions.push("同一あて先・複数口割引");
+    }
+    if (isCarryIn) { 
+      finalPrice -= 120; 
+      breakdownText += `<br>- 持込割引: 120円`; 
+      activeOptions.push("持込割引");
+    }
+    if (isChilled) { 
+      finalPrice += chilled_fees[size]; 
+      breakdownText += `<br>+ チルド加算: ${chilled_fees[size].toLocaleString()}円`; 
+      activeOptions.push("チルドゆうパック");
+    }
+    if (isWeight) { 
+      finalPrice += 560; 
+      breakdownText += `<br>+ 重量加算: 560円`; 
+      activeOptions.push("重量ゆうパック");
+    }
+
+    document.getElementById("result").innerText = `${finalPrice.toLocaleString()} 円`;
+    document.getElementById("breakdown").innerHTML = breakdownText;
+
+    const optionsLabel = document.getElementById("selected-options-label");
+    if (activeOptions.length > 0) {
+      optionsLabel.innerHTML = activeOptions.join("<br> ＋ ");
+      optionsLabel.style.display = "inline-block";
+    } else {
+      optionsLabel.style.display = "none";
+    }
+
+    if (changedId !== 'init') {
+      if (lastPrice !== 0 && finalPrice !== lastPrice) {
+        if (finalPrice < lastPrice) {
+          playDQSound('discount'); 
+        } else {
+          playDQSound('coin'); 
+        }
+      }
+    }
+    lastPrice = finalPrice; 
+  }
+
+  window.onload = function() { initSelects(); handleLogic('init'); };
+</script>
+
+</body>
+</html>
